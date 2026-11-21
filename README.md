@@ -1,6 +1,12 @@
 # MC模组编辑器
 
-一个用于创作《我的世界》模组的图形化桌面工坊。多文件模块化架构，PyQt5 构建，提供专业安装包。
+一个用于创作《我的世界》模组的图形化桌面工坊。多文件模块化架构，PyQt5 构建，提供安装包。
+
+## 🌐 在线资源
+
+- **官网下载页**：http://47.95.246.166/mcmodeditor/
+- **GitHub 仓库**：https://github.com/zhutonghuo/MCModEditor
+- **GitHub Release（含安装包）**：https://github.com/zhutonghuo/MCModEditor/releases/tag/v1.0
 
 ## ✨ 功能
 

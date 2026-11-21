@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MC模组编辑器 - 我的世界模组创作工坊</title>
+<style>
+:root{--bg:#f4f6fb;--panel:#fff;--text:#1c2333;--dim:#6b7386;--accent:#4a6cf7;--border:#d8ddea;--card:#fff;--shadow:rgba(30,40,80,.1)}
+body.dark{--bg:#141824;--panel:#1e2332;--text:#e8ecf6;--dim:#9aa3ba;--accent:#6d8bff;--border:#353d52;--card:#1e2332;--shadow:rgba(0,0,0,.4)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei UI","Segoe UI",sans-serif;background:var(--bg);color:var(--text);transition:.3s;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+header{padding:28px 0;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:20px;font-weight:800;color:var(--accent)}
+.theme-btn{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);cursor:pointer;font-size:13px}
+.hero{text-align:center;padding:60px 0 40px}
+.hero h1{font-size:44px;margin-bottom:12px}
+.hero .sub{font-size:17px;color:var(--dim);margin-bottom:28px}
+.btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;padding:14px 30px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;transition:.2s}
+.btn-main{background:var(--accent);color:#fff}
+.btn-main:hover{transform:translateY(-2px);box-shadow:0 8px 20px var(--shadow)}
+.btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border)}
+.version{color:var(--dim);font-size:13px;margin-top:14px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:30px 0 50px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 4px 14px var(--shadow)}
+.card h3{font-size:17px;margin-bottom:8px;color:var(--accent)}
+.card p{color:var(--dim);font-size:14px}
+.card .ic{font-size:26px;margin-bottom:8px}
+footer{text-align:center;padding:30px;color:var(--dim);font-size:13px;border-top:1px solid var(--border)}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.hero h1{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div class="logo">◆ MC模组编辑器</div><button class="theme-btn" onclick="toggleTheme()">🌙 切换主题</button></header>
+<section class="hero">
+<h1>铸造你的我的世界模组</h1>
+<div class="sub">模型 · 动画 · 物品栏 · 积木编程 · 命令 · UI —— 六大工坊，一站式创作</div>
+<div class="btns">
+<a class="btn btn-main" href="下载/MCModEditor-Setup-v1.0.exe">⬇ 下载安装程序 (82 MB)</a>
+<a class="btn btn-ghost" href="https://github.com/zhutonghuo/MCModEditor">查看源码</a>
+</div>
+<div class="version">v1.0 · Windows x64 · 完全离线运行</div>
+</section>
+<div class="grid">
+<div class="card"><div class="ic">◇</div><h3>模型 & 动画工坊</h3><p>体素堆砌雕刻物品外形，等距 3D 实时预览；关键帧时间轴让模型真正动起来。</p></div>
+<div class="card"><div class="ic">▣</div><h3>物品栏工坊</h3><p>设定名称、描述、堆叠、耐久、稀有度与发光效果，实时预览物品栏外观。</p></div>
+<div class="card"><div class="ic">▦</div><h3>积木编程</h3><p>拖拽事件/条件/动作积木拼接行为逻辑，参数可编辑，一键生成 MC 命令。</p></div>
+<div class="card"><div class="ic">⌘</div><h3>命令工坊</h3><p>10 类命令模板可视化拼参，命令列表管理与语法校验，导出 mcfunction。</p></div>
+<div class="card"><div class="ic">▤</div><h3>UI 工坊</h3><p>拖拽式界面设计器，按钮/文本/输入框/面板/图片/复选框，导出界面 JSON。</p></div>
+<div class="card"><div class="ic">◇</div><h3>导出与工程</h3><p>工程保存加载，一键导出资源包/数据包/界面 JSON，直接放入 Minecraft 使用。</p></div>
+</div>
+<footer>MC模组编辑器 · 由 WorkBuddy 打造 · MIT 开源</footer>
+</div>
+<script>
+function toggleTheme(){document.body.classList.toggle('dark');localStorage.setItem('mcme-theme',document.body.classList.contains('dark')?'dark':'light')}
+if(localStorage.getItem('mcme-theme')==='dark')document.body.classList.add('dark');
+</script>
+</body>
+</html>
