@@ -141,6 +141,15 @@ def icon(name, size=28, color=None):
         p.drawRoundedRect(R(5, 7, 14, 14), 2 * u, 2 * u)
         p.drawLine(P(9, 11), P(9, 18)); p.drawLine(P(15, 11), P(15, 18))
         p.drawLine(P(3, 7), P(21, 7))
+    elif name == "update":
+        # 循环箭头：一段顺时针圆弧 + 箭头 + 中心向下箭头
+        _pen(p, c, 1.9)
+        p.drawArc(R(4, 4, 16, 16), 40 * 16, 290 * 16)
+        # 右上箭头
+        p.drawLine(P(17, 6), P(20, 4)); p.drawLine(P(17, 6), P(19, 9))
+        # 中心下载箭头
+        p.drawLine(P(12, 9), P(12, 16))
+        p.drawLine(P(9, 13), P(12, 16)); p.drawLine(P(15, 13), P(12, 16))
     else:
         _pen(p, c, 1.8)
         p.drawEllipse(P(12, 12), 8 * u, 8 * u)

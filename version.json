@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "version_code": 100,
+  "date": "2026-11-21",
+  "changelog": [
+    "新增「检查更新」按钮，支持一键自动更新",
+    "安装程序自动检测已装版本并覆盖更新（不卸载、保留工程）",
+    "支持选择其他目录全新安装",
+    "修复启动崩溃，新增程序与安装包图标"
+  ],
+  "package_url": "http://47.95.246.166/mcmodeditor/%E4%B8%8B%E8%BD%BD/MCModEditor-Update-v1.0.zip",
+  "package_size": 37971880,
+  "sha1": "2301ec30da86ee86272600ffda5770a253c33bc8",
+  "setup_url": "http://47.95.246.166/mcmodeditor/%E4%B8%8B%E8%BD%BD/MCModEditor-Setup-v1.0.exe",
+  "green_url": "http://47.95.246.166/mcmodeditor/dist/"
+}

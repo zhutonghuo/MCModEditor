@@ -1,14 +1,17 @@
 import os
 import json
+import tempfile
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton,
     QLabel, QStackedWidget, QToolBar, QMenuBar, QMenu, QAction, QFileDialog,
-    QMessageBox, QInputDialog, QSplitter, QStatusBar, QLineEdit,
+    QMessageBox, QInputDialog, QSplitter, QStatusBar, QLineEdit, QProgressDialog,
+    QApplication,
 )
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 from core.project import Project
-from core import exporter
+from core import exporter, updater
+from core.version import APP_VERSION, VERSION_CODE
 from ui import icons, theme as theme_mod
 from ui.model_editor import ModelEditor
 from ui.animation_editor import AnimationEditor
@@ -27,11 +30,47 @@ WORKSHOPS = [
 ]
 
 
+class CheckThread(QThread):
+    """后台拉取服务器版本清单。"""
+    result = pyqtSignal(object)
+    error = pyqtSignal(str)
+
+    def run(self):
+        try:
+            self.result.emit(updater.fetch_version())
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
+class DownloadThread(QThread):
+    """后台下载更新包并校验 SHA1。"""
+    progress = pyqtSignal(int)
+    done = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+    def __init__(self, url, dest, sha1=""):
+        super().__init__()
+        self.url, self.dest, self.sha1 = url, dest, sha1
+
+    def run(self):
+        try:
+            def cb(done, total):
+                if total > 0:
+                    self.progress.emit(int(done * 100 / total))
+            updater.download_package(self.url, self.dest, cb)
+            if self.sha1 and not updater.verify(self.dest, self.sha1):
+                raise ValueError("更新包校验失败（SHA1 不匹配），已放弃安装")
+            self.done.emit(self.dest)
+        except Exception as exc:
+            self.error.emit(str(exc))
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.project = Project.demo()
         self.dirty = False
+        self._updating = False
         self.setWindowTitle("MC模组编辑器 — 我的世界模组创作工坊")
         self.resize(1180, 760)
         self._build()
@@ -112,6 +151,7 @@ class MainWindow(QMainWindow):
         mview.addAction("切换明暗主题", self.toggle_theme)
 
         mhelp = mb.addMenu("帮助")
+        mhelp.addAction(icons.get("update", 20), "检查更新...", self.check_update)
         mhelp.addAction("关于", self.about)
         return mb
 
@@ -131,6 +171,8 @@ class MainWindow(QMainWindow):
             tb.addAction(act)
         tb.addSeparator()
         act = QAction(icons.get("theme", 22), "主题", self); act.triggered.connect(self.toggle_theme); tb.addAction(act)
+        act = QAction(icons.get("update", 22), "检查更新", self); act.triggered.connect(self.check_update)
+        act.setToolTip("检查服务器上的新版本并自动更新"); tb.addAction(act)
         self.addToolBar(tb)
 
     def goto(self, key):
@@ -277,13 +319,122 @@ class MainWindow(QMainWindow):
                 except Exception: pass
         self.statusBar().showMessage("已切换到" + ("暗色" if cur == "dark" else "亮色") + "主题")
 
+    # ---------- 自动更新 ----------
+    def check_update(self):
+        self.statusBar().showMessage("正在检查更新...")
+        self._wait = QProgressDialog("正在连接更新服务器...", "", 0, 0, self)
+        self._wait.setWindowTitle("检查更新")
+        self._wait.setCancelButton(None)
+        self._wait.setModal(True)
+        self._wait.show()
+        QApplication.processEvents()
+        self._check = CheckThread(self)
+        self._check.result.connect(self.on_check_result)
+        self._check.error.connect(self.on_check_error)
+        self._check.start()
+
+    def on_check_error(self, msg):
+        if hasattr(self, "_wait"):
+            self._wait.close()
+        self.statusBar().showMessage("检查更新失败")
+        QMessageBox.warning(self, "检查更新失败",
+            "无法连接更新服务器，请检查网络后重试。\n\n" + msg[:200])
+
+    def on_check_result(self, info):
+        if hasattr(self, "_wait"):
+            self._wait.close()
+        try:
+            new_code = updater.code_of(info.get("version_code"))
+            new_ver = info.get("version", "?")
+            if new_code <= VERSION_CODE:
+                self.statusBar().showMessage(f"已是最新版本 v{APP_VERSION}")
+                QMessageBox.information(self, "检查更新",
+                    f"当前已是最新版本 v{APP_VERSION}。\n\n无需更新。")
+                return
+            changes = info.get("changelog", "")
+            if isinstance(changes, list):
+                changes = "\n".join("  • " + str(c) for c in changes)
+            size = updater.human_size(info.get("package_size", 0))
+            date = info.get("date", "")
+            text = (f"发现新版本 v{new_ver}"
+                    + (f"（{date}）" if date else "") + "\n\n"
+                    + (f"更新内容：\n{changes}\n\n" if changes else "")
+                    + f"更新包大小：{size}\n\n"
+                    + "是否立即下载并安装？\n"
+                    + "安装过程不会卸载现有程序，也不会删除你的工程文件。")
+            reply = QMessageBox.question(self, "发现新版本", text,
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if reply == QMessageBox.Yes:
+                self.start_download(info)
+            else:
+                self.statusBar().showMessage(f"发现新版本 v{new_ver}（已跳过）")
+        except Exception as exc:
+            QMessageBox.critical(self, "检查更新失败", str(exc))
+
+    def start_download(self, info):
+        url = info.get("package_url", "")
+        if not url:
+            QMessageBox.critical(self, "更新失败", "版本清单缺少更新包地址。")
+            return
+        dest = os.path.join(tempfile.gettempdir(),
+                            f"mcme_update_{info.get('version_code', 'x')}.zip")
+        self._dlg = QProgressDialog("正在下载更新包...", "取消", 0, 100, self)
+        self._dlg.setWindowTitle("下载更新")
+        self._dlg.setModal(True)
+        self._dlg.setMinimumDuration(0)
+        self._dlg.setValue(0)
+        self._dlg.canceled.connect(self.on_download_canceled)
+        self._dlg.show()
+        self._dl = DownloadThread(url, dest, info.get("sha1", ""))
+        self._dl.progress.connect(self._dlg.setValue)
+        self._dl.done.connect(self.on_download_done)
+        self._dl.error.connect(self.on_download_error)
+        self._dl.start()
+
+    def on_download_canceled(self):
+        if hasattr(self, "_dl") and self._dl.isRunning():
+            self._dl.terminate()
+        self.statusBar().showMessage("已取消更新")
+
+    def on_download_error(self, msg):
+        if hasattr(self, "_dlg"):
+            self._dlg.close()
+        QMessageBox.critical(self, "下载失败", "更新包下载失败：\n\n" + msg[:300])
+
+    def on_download_done(self, path):
+        if hasattr(self, "_dlg"):
+            self._dlg.close()
+        # 提示后退出：覆盖器会在本进程退出后替换文件并自动重启
+        msg = QMessageBox.information(
+            self, "准备安装",
+            "更新包已下载并校验完成。\n\n"
+            "点击「确定」后程序将退出，并在后台自动完成安装与重启。\n"
+            "整个过程不会卸载程序，也不会删除你的工程文件。")
+        QApplication.processEvents()
+        ok, _ = updater.schedule_apply(path)
+        if not ok:
+            QMessageBox.critical(self, "安装失败", "无法启动更新程序，请手动下载安装程序覆盖更新。")
+            return
+        # 保存工程提示：若未保存给用户最后机会
+        if self.dirty:
+            if QMessageBox.question(self, "未保存的更改",
+                    "当前工程有未保存的更改，更新会保留程序但不会保存工程。\n仍要继续更新吗？",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+                return
+        self._updating = True
+        self.close()
+        QApplication.quit()
+
     def about(self):
         QMessageBox.about(self, "关于 MC模组编辑器",
-            "MC模组编辑器 v1.0\n\n一个用于创作我的世界模组的图形化工坊：\n"
+            f"MC模组编辑器 v{APP_VERSION}\n\n一个用于创作我的世界模组的图形化工坊：\n"
             "模型 · 动画 · 物品栏外观 · 积木编程 · 命令 · 界面\n\n"
             "导出资源包 / 数据包 / 界面 JSON，可直接放入 Minecraft 使用。")
 
     def closeEvent(self, e):
+        if getattr(self, "_updating", False):
+            e.accept()
+            return
         if self.dirty and QMessageBox.question(self, "未保存", "工程有未保存的更改，确定退出？") != QMessageBox.Yes:
             e.ignore()
         else:
