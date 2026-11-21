@@ -1,13 +1,19 @@
 
-import os, sys, shutil
+import os, sys, shutil, subprocess
 from PyQt5.QtWidgets import (QApplication, QWizard, QWizardPage, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QFileDialog, QProgressBar, QCheckBox, QMessageBox)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QIcon, QPixmap
 import win32com.client
 from win32com.shell import shell, shellcon
 
 APP = "MC模组编辑器"
 VER = "1.0"
+
+def res_dir():
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "_res")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "_res")
 
 def payload_dir():
     if hasattr(sys, "_MEIPASS"):
@@ -53,12 +59,14 @@ class InstallThread(QThread):
                 os.makedirs(sm, exist_ok=True)
                 targets.append(os.path.join(sm, APP + ".lnk"))
             except Exception: pass
+        ico = os.path.join(res_dir(), "setup.ico")
         for lnk in targets:
             try:
                 s = sh.CreateShortCut(lnk)
                 s.TargetPath = exe
                 s.WorkingDirectory = os.path.dirname(exe)
                 s.Description = APP + " - 我的世界模组创作工坊"
+                if os.path.exists(ico): s.IconLocation = ico + ",0"
                 s.save()
             except Exception: pass
 
@@ -68,6 +76,13 @@ class Page1(QWizardPage):
         self.setTitle("欢迎使用 " + APP + " 安装包")
         self.setSubTitle("版本 " + VER + " · 点击下一步开始安装")
         l = QVBoxLayout()
+        head = QHBoxLayout()
+        ico = os.path.join(res_dir(), "setup.png")
+        if os.path.exists(ico):
+            pm = QPixmap(ico).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            lb = QLabel(); lb.setPixmap(pm); head.addWidget(lb)
+        head.addWidget(QLabel("六合一我的世界模组创作工坊"))
+        l.addLayout(head)
         l.addWidget(QLabel("本向导将安装："))
         for t in ["模型 / 动画 / 物品栏 / 积木编程 / 命令 / UI 六大工坊",
                   "桌面与开始菜单快捷方式", "完整的离线运行环境"]:
@@ -93,10 +108,15 @@ class Page2(QWizardPage):
 class Page3(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("选择快捷方式")
+        self.setTitle("安装选项")
         self.cb_desktop = QCheckBox("创建桌面快捷方式"); self.cb_desktop.setChecked(True)
         self.cb_menu = QCheckBox("创建开始菜单快捷方式"); self.cb_menu.setChecked(True)
-        l = QVBoxLayout(); l.addWidget(self.cb_desktop); l.addWidget(self.cb_menu)
+        self.cb_open = QCheckBox("打开编辑器"); self.cb_open.setChecked(True)
+        l = QVBoxLayout()
+        l.addWidget(QLabel("快捷方式："))
+        l.addWidget(self.cb_desktop); l.addWidget(self.cb_menu)
+        l.addWidget(QLabel("安装完成后："))
+        l.addWidget(self.cb_open)
         self.setLayout(l)
 
 class Page4(QWizardPage):
@@ -117,21 +137,38 @@ class Page4(QWizardPage):
     def on_progress(self, v, msg):
         self.bar.setValue(v); self.label.setText("正在安装: " + msg)
     def on_done(self, ok, msg):
+        self.w.install_ok = ok
         if ok:
-            QMessageBox.information(self, "完成", APP + " 安装成功！\n\n" + msg)
+            self.w.installed_exe = os.path.join(self.w.edit.text(), APP + ".exe")
+            self.label.setText("安装完成，点击「完成」结束")
         else:
-            QMessageBox.critical(self, "失败", msg)
+            self.label.setText("安装失败: " + msg)
 
 class Wizard(QWizard):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP + " 安装向导")
         self.resize(560, 400)
+        self.install_ok = False
+        self.installed_exe = ""
+        ico = os.path.join(res_dir(), "setup.ico")
+        if os.path.exists(ico): self.setWindowIcon(QIcon(ico))
         self.p1 = Page1(); self.p2 = Page2(); self.p3 = Page3(); self.p4 = Page4(self)
         self.addPage(self.p1); self.addPage(self.p2); self.addPage(self.p3); self.addPage(self.p4)
-        self.edit = self.p2.edit; self.cb_desktop = self.p3.cb_desktop; self.cb_menu = self.p3.cb_menu
+        self.edit = self.p2.edit; self.cb_desktop = self.p3.cb_desktop
+        self.cb_menu = self.p3.cb_menu; self.cb_open = self.p3.cb_open
+    def accept(self):
+        do_open = self.install_ok and self.cb_open.isChecked() and os.path.exists(self.installed_exe)
+        exe = self.installed_exe
+        super().accept()
+        if do_open:
+            try:
+                subprocess.Popen([exe], cwd=os.path.dirname(exe))
+            except Exception: pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    ico = os.path.join(res_dir(), "setup.ico")
+    if os.path.exists(ico): app.setWindowIcon(QIcon(ico))
     w = Wizard(); w.show()
     sys.exit(app.exec_())

@@ -9,7 +9,7 @@ a = Analysis(
     [os.path.join(SRC, "main.py")],
     pathex=[SRC],
     binaries=[],
-    datas=[],
+    datas=[(os.path.join(SRC, "resources"), "resources")],
     hiddenimports=[
         "PyQt5.QtCore", "PyQt5.QtGui", "PyQt5.QtWidgets",
     ],
@@ -21,8 +21,7 @@ a = Analysis(
         "QtBluetooth", "QtNfc", "QtPositioning", "QtSensors", "QtSerialPort",
         "QtMultimedia", "QtMultimediaWidgets", "QtOpenGL", "QtSql", "QtTest",
         "QtDesigner", "QtHelp", "QtPrintSupport", "QtSvg", "QtXml", "QtXmlPatterns",
-        "matplotlib", "numpy", "PIL", "tkinter", "unittest", "email", "http", "urllib",
-        "xml", "logging", "pydoc", "doctest",
+        "matplotlib", "numpy", "PIL", "tkinter",
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -47,7 +46,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=os.path.join(SRC, "resources", "app.ico"),
 )
 coll = COLLECT(
     exe,
