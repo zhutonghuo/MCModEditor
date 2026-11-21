@@ -19,15 +19,22 @@
 | ⌘ 命令工坊 | 10 类命令模板可视化拼参，命令列表管理与语法校验 |
 | 🎛️ UI 工坊 | 拖拽式界面设计器（按钮/文本/输入框/面板/图片/复选框），属性编辑，导出界面 JSON |
 
-另有：工程保存/加载（`.mcme`）、一键导出资源包/数据包/界面 JSON、明暗主题切换、全自绘矢量图标（无 emoji）。
+另有：工程保存/加载（`.mcme`）、一键导出资源包/数据包/界面 JSON、明暗主题切换、全自绘矢量图标（无 emoji）、**一键自动更新**。
+
+## 🔄 自动更新（重点）
+
+- **程序内更新**：点工具栏/帮助菜单的「检查更新」，自动拉取服务器 `version.json`，发现新版后显示更新日志、下载并校验 SHA1，程序退出后在后台覆盖安装并自动重启。**不卸载、不删除工程文件**。
+- **安装包覆盖更新**：再次运行安装包时，会自动扫描注册表/常见目录/快捷方式定位已安装目录，显著提示"检测到已安装 vX，继续将覆盖更新"，默认定位到该目录；覆盖只替换程序文件，保留你的工程。若想换目录全新安装，点「浏览」选择其他位置即可。
+- 更新包：`MCModEditor-Update-v1.0.zip`（绿色版，供程序内更新下载）；服务器清单：`version.json`。
+
+发新版流程：提升 `src/core/version.py` 的版本号 → `python build.py` → `python make_version.py`（生成 zip+清单）→ 上传服务器并更新 `version.json`。
 
 ## 📦 安装
 
-运行 `MC模组编辑器_安装包_v1.0.exe`，一路下一步即可。支持：
-- 开始菜单快捷方式
-- 桌面快捷方式
-- `.mcme` 工程文件关联
-- 干净的卸载器
+运行 `MCModEditor-Setup-v1.0.exe`，一路下一步即可。支持：
+- 开始菜单 / 桌面快捷方式
+- 安装完成自动打开编辑器（可取消勾选）
+- 覆盖更新（保留工程文件）
 
 也可直接运行绿色版：进入 `dist/MC模组编辑器/`，双击 `MC模组编辑器.exe`。
 
@@ -43,7 +50,9 @@ python main.py
 
 ```bash
 python build.py                          # 多文件 exe → dist/
-ISCC.exe installer.iss                   # 安装包 → 安装包/
+python 安装程序/make_installer.py        # 安装包 → 安装包/
+python make_version.py                   # 更新包 zip + version.json
+python publish.py                        # 发布到服务器 + GitHub（需环境变量）
 ```
 
 ## 📂 目录结构
@@ -52,11 +61,14 @@ ISCC.exe installer.iss                   # 安装包 → 安装包/
 MC模组编辑器/
 ├── src/
 │   ├── main.py              # 程序入口
-│   ├── core/                # 数据层：工程/模型/动画/积木/命令/导出
+│   ├── core/                # 数据层：工程/模型/动画/积木/命令/导出/自动更新
 │   └── ui/                  # 界面层：六大编辑器 + 主窗口 + 图标/主题
+├── 安装程序/
+│   ├── installer_src.py     # 安装向导源码（检测已装 + 覆盖更新）
+│   └── make_installer.py    # 安装包构建脚本
 ├── build.py                 # PyInstaller 构建脚本
-├── MC模组编辑器.spec        # 打包配置
-├── installer.iss            # Inno Setup 安装脚本
+├── make_version.py          # 更新包与版本清单生成
+├── version.json             # 服务器版本清单
 └── dist/                    # 打包产物
 ```
 
