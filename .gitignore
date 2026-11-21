@@ -1,0 +1,11 @@
+build/
+_build/
+dist/
+安装包/
+安装程序/build_tmp/
+安装程序/build_dist/
+_payload_tmp/
+*.pyc
+__pycache__/
+.tmp/
+*.issig

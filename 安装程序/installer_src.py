@@ -1,0 +1,137 @@
+
+import os, sys, shutil
+from PyQt5.QtWidgets import (QApplication, QWizard, QWizardPage, QVBoxLayout, QHBoxLayout,
+    QLabel, QLineEdit, QPushButton, QFileDialog, QProgressBar, QCheckBox, QMessageBox)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+import win32com.client
+from win32com.shell import shell, shellcon
+
+APP = "MC模组编辑器"
+VER = "1.0"
+
+def payload_dir():
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "_payload")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "_payload")
+
+class InstallThread(QThread):
+    progress = pyqtSignal(int, str)
+    done = pyqtSignal(bool, str)
+    def __init__(self, target, desktop, startmenu):
+        super().__init__()
+        self.target = target; self.desktop = desktop; self.startmenu = startmenu
+    def run(self):
+        try:
+            os.makedirs(self.target, exist_ok=True)
+            payload = payload_dir()
+            files = []
+            for root, dirs, fs in os.walk(payload):
+                for f in fs: files.append(os.path.join(root, f))
+            total = len(files)
+            for i, f in enumerate(files):
+                rel = os.path.relpath(f, payload)
+                dst = os.path.join(self.target, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(f, dst)
+                self.progress.emit(int((i+1)/total*100), rel)
+            exe = os.path.join(self.target, APP + ".exe")
+            self.make_shortcut(exe)
+            self.progress.emit(100, "完成")
+            self.done.emit(True, self.target)
+        except Exception as e:
+            self.done.emit(False, str(e))
+    def make_shortcut(self, exe):
+        sh = win32com.client.Dispatch("WScript.Shell")
+        targets = []
+        if self.desktop:
+            try:
+                targets.append(os.path.join(shell.SHGetFolderPath(0, shellcon.CSIDL_DESKTOP, None, 0), APP + ".lnk"))
+            except Exception: pass
+        if self.startmenu:
+            try:
+                sm = os.path.join(shell.SHGetFolderPath(0, shellcon.CSIDL_PROGRAMS, None, 0), APP)
+                os.makedirs(sm, exist_ok=True)
+                targets.append(os.path.join(sm, APP + ".lnk"))
+            except Exception: pass
+        for lnk in targets:
+            try:
+                s = sh.CreateShortCut(lnk)
+                s.TargetPath = exe
+                s.WorkingDirectory = os.path.dirname(exe)
+                s.Description = APP + " - 我的世界模组创作工坊"
+                s.save()
+            except Exception: pass
+
+class Page1(QWizardPage):
+    def __init__(self):
+        super().__init__()
+        self.setTitle("欢迎使用 " + APP + " 安装包")
+        self.setSubTitle("版本 " + VER + " · 点击下一步开始安装")
+        l = QVBoxLayout()
+        l.addWidget(QLabel("本向导将安装："))
+        for t in ["模型 / 动画 / 物品栏 / 积木编程 / 命令 / UI 六大工坊",
+                  "桌面与开始菜单快捷方式", "完整的离线运行环境"]:
+            l.addWidget(QLabel("  * " + t))
+        self.setLayout(l)
+
+class Page2(QWizardPage):
+    def __init__(self):
+        super().__init__()
+        self.setTitle("选择安装位置")
+        default = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), APP)
+        self.edit = QLineEdit(default)
+        l = QVBoxLayout(); l.addWidget(QLabel("安装目录："))
+        h = QHBoxLayout(); h.addWidget(self.edit)
+        b = QPushButton("浏览..."); b.clicked.connect(self.browse); h.addWidget(b)
+        l.addLayout(h); self.setLayout(l)
+    def browse(self):
+        d = QFileDialog.getExistingDirectory(self, "选择目录", self.edit.text())
+        if d: self.edit.setText(os.path.join(d, APP))
+    def validatePage(self):
+        return bool(self.edit.text().strip())
+
+class Page3(QWizardPage):
+    def __init__(self):
+        super().__init__()
+        self.setTitle("选择快捷方式")
+        self.cb_desktop = QCheckBox("创建桌面快捷方式"); self.cb_desktop.setChecked(True)
+        self.cb_menu = QCheckBox("创建开始菜单快捷方式"); self.cb_menu.setChecked(True)
+        l = QVBoxLayout(); l.addWidget(self.cb_desktop); l.addWidget(self.cb_menu)
+        self.setLayout(l)
+
+class Page4(QWizardPage):
+    def __init__(self, wizard):
+        super().__init__(); self.w = wizard
+        self.setTitle("正在安装")
+        self.bar = QProgressBar(); self.label = QLabel("准备中...")
+        l = QVBoxLayout(); l.addWidget(self.label); l.addWidget(self.bar); self.setLayout(l)
+        self.setFinalPage(True)
+    def setVisible(self, v):
+        super().setVisible(v)
+        if v and not getattr(self, "_started", False):
+            self._started = True
+            self.thread = InstallThread(self.w.edit.text(), self.w.cb_desktop.isChecked(), self.w.cb_menu.isChecked())
+            self.thread.progress.connect(self.on_progress)
+            self.thread.done.connect(self.on_done)
+            self.thread.start()
+    def on_progress(self, v, msg):
+        self.bar.setValue(v); self.label.setText("正在安装: " + msg)
+    def on_done(self, ok, msg):
+        if ok:
+            QMessageBox.information(self, "完成", APP + " 安装成功！\n\n" + msg)
+        else:
+            QMessageBox.critical(self, "失败", msg)
+
+class Wizard(QWizard):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(APP + " 安装向导")
+        self.resize(560, 400)
+        self.p1 = Page1(); self.p2 = Page2(); self.p3 = Page3(); self.p4 = Page4(self)
+        self.addPage(self.p1); self.addPage(self.p2); self.addPage(self.p3); self.addPage(self.p4)
+        self.edit = self.p2.edit; self.cb_desktop = self.p3.cb_desktop; self.cb_menu = self.p3.cb_menu
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    w = Wizard(); w.show()
+    sys.exit(app.exec_())
